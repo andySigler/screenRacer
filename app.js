@@ -1,5 +1,6 @@
 var express = require('express');
 var http = require('http');
+var path = require('path');
 
 //express stuff
 var app = express();
@@ -18,19 +19,23 @@ app.configure(function(){
 	//that 'html' engine is technically the hogan-express engine
 	app.engine('html',require('hogan-express'));
 
-}
+	app.use(express.favicon());
+  	app.use(express.bodyParser());
+  	app.use(express.methodOverride());
+  	app.use(app.router);
+  	app.use(express.static(path.join(__dirname, 'public')));
+});
 
 
 
 //routing stuff
-var routes = require('/routes/index.js');
+var routes = require(__dirname + '/routes/index.js');
 
 app.get('/',routes.index);
 
 
 
 //and finally, make the server
-http.createServer(app);
-http.listen(app.get('port'),function(){
+http.createServer(app).listen(app.get('port'),function(){
 	console.log('http server listening at port ' + app.get('port'));
 });
