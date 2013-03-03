@@ -20,6 +20,15 @@ app.configure(function(){
 
 }
 
+
+
+//routing stuff
+var routes = require('/routes/index.js');
+
+app.get('/',routes.index);
+
+
+
 //and finally, make the server
 http.createServer(app);
 http.listen(app.get('port'),function(){
