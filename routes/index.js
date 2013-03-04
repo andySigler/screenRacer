@@ -31,16 +31,25 @@ exports.content = function(req,res){
 
 		"comments": [
 			{
+				"id": "someId1",
 				"name": "Ivana Humpalot",
-				"content": "this vid sux"
+				"content": "my vid sux",
+				"start": 1,
+				"end": 3
 			},
 			{
+				"id": "someId2",
 				"name": "Pete Sweeney",
-				"content": "this vid rox"
+				"content": "my vid rox",
+				"start": 2,
+				"end": 3
 			},
 			{
+				"id": "someId3",
 				"name": "My Mom",
-				"content": "I'm not mad, I'm just disappointed"
+				"content": "I'm not mad, just disappointed",
+				"start": 2,
+				"end": 6
 			}
 		]
 
