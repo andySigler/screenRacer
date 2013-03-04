@@ -32,6 +32,7 @@ app.configure(function(){
 var routes = require(__dirname + '/routes/index.js');
 
 app.get('/',routes.index);
+app.get('/content/*',routes.content);
 
 
 
