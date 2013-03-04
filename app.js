@@ -1,6 +1,8 @@
 var express = require('express');
 var http = require('http');
 var path = require('path');
+var mongoose = require('mongoose');
+var moment = require('moment');
 
 //express stuff
 var app = express();
@@ -24,6 +26,7 @@ app.configure(function(){
   	app.use(express.methodOverride());
   	app.use(app.router);
   	app.use(express.static(path.join(__dirname, 'public')));
+  	app.db = mongoose.connect(process.env.MONGOLAB_URI);
 });
 
 
@@ -32,7 +35,9 @@ app.configure(function(){
 var routes = require(__dirname + '/routes/index.js');
 
 app.get('/',routes.index);
-app.get('/content/*',routes.content);
+app.get('/video/*',routes.video);
+app.post('/newVideo',routes.newVideo);
+app.post('/newComment/*',routes.newComment);
 
 
 
@@ -40,3 +45,4 @@ app.get('/content/*',routes.content);
 http.createServer(app).listen(app.get('port'),function(){
 	console.log('http server listening at port ' + app.get('port'));
 });
+

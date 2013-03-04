@@ -1,0 +1,64 @@
+<form method="POST" action="/newComment/{{id}}">
+
+	<label for="name">
+		Name <input type="text" name="name" id="name"> 
+	</label>
+	
+	<label for="comment">
+		Comment <input type="text" name="content" id="content"> 
+	</label>
+
+	<label for="start">
+		Start (seconds) <input type="text" name="start" id="start"> 
+	</label>
+
+	<label for="start">
+		End (seconds) <input type="text" name="end" id="end"> 
+	</label>
+	
+	<input type="submit" value="Add Comment">
+
+</form>
+
+<div class="videoContent">
+	<h3>{{title}}</h3>
+	<div id="video" style="width: 360px; height: 300px;" ></div>
+</div>
+
+<div id="commentList">
+	<h5>Comments</h5>
+</div>
+
+<script src="http://popcornjs.org/code/dist/popcorn-complete.min.js"></script>
+
+<script>
+	// ensure the web page (DOM) has loaded
+	document.addEventListener("DOMContentLoaded", function () {
+
+		// Create a popcorn instance by calling the Youtube player plugin
+		var thisVid = Popcorn.vimeo(
+			'#video',
+			'{{url}}'
+		);
+
+		{{#comments}}
+
+		thisVid.code({
+			start: {{start}},
+			end: {{end}},
+			onStart: function(){
+				document.getElementById('commentList').innerHTML += '<div id=\'{{start}}{{end}}\' class=\'commentCell\'>' + 
+							'<li>{{name}}</li>' + 
+							'<p>{{content}}</p></div>';
+			},
+			onEnd: function(){
+				document.getElementById('{{start}}{{end}}').innerHTML = '';
+			}
+		});
+		{{/comments}}
+
+		// play the video right away
+		//thisVid.play();
+
+	}, false);
+</script>
