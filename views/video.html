@@ -1,4 +1,4 @@
-<form method="POST" action="/newComment/{{id}}">
+<form method="POST" action="/newComment/{{video._id}}">
 
 	<label for="name">
 		Name <input type="text" name="name" id="name"> 
@@ -21,7 +21,7 @@
 </form>
 
 <div class="videoContent">
-	<h3>{{title}}</h3>
+	<h3>{{video.title}}</h3>
 	<div id="video" style="width: 360px; height: 300px;" ></div>
 </div>
 
@@ -34,25 +34,38 @@
 <script>
 	// ensure the web page (DOM) has loaded
 	document.addEventListener("DOMContentLoaded", function () {
+		var url = '{{video.url}}';
+		var thisVid;
 
-		// Create a popcorn instance by calling the Youtube player plugin
-		var thisVid = Popcorn.vimeo(
-			'#video',
-			'{{url}}'
-		);
+		if(url.indexOf('vimeo')>0){
+			thisVid = Popcorn.vimeo(
+				'#video',
+				url
+			);
+		}
+		else if(url.indexOf('youtube')>0){
+			thisVid = Popcorn.youtube(
+				'#video',
+				url
+			);
+		}
 
 		{{#comments}}
+
+
 
 		thisVid.code({
 			start: {{start}},
 			end: {{end}},
 			onStart: function(){
-				document.getElementById('commentList').innerHTML += '<div id=\'{{start}}{{end}}\' class=\'commentCell\'>' + 
-							'<li>{{name}}</li>' + 
-							'<p>{{content}}</p></div>';
+				var div{{start}}{{end}} = document.createElement("div");
+				div{{start}}{{end}}.id = '{{start}}{{end}}';
+				div{{start}}{{end}}.innerHTML = '<li>{{name}}</li><p>{{comment}}</p></div>';
+				document.getElementById('commentList').appendChild(div{{start}}{{end}});
 			},
 			onEnd: function(){
-				document.getElementById('{{start}}{{end}}').innerHTML = '';
+				var div{{start}}{{end}} = document.getElementById('{{start}}{{end}}');
+				document.getElementById('commentList').removeChild(div{{start}}{{end}});
 			}
 		});
 		{{/comments}}

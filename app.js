@@ -45,4 +45,3 @@ app.post('/newComment/*',routes.newComment);
 http.createServer(app).listen(app.get('port'),function(){
 	console.log('http server listening at port ' + app.get('port'));
 });
-

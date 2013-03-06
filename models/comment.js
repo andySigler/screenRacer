@@ -3,12 +3,13 @@ var Schema = mongoose.Schema;
 
 // define a new schema
 var CommentSchema = new Schema({
-	name : String,
-	content : String,
-	start : String,
-	end: String,
-	id: String,
-	realId: String
+	'name' : String,
+	'comment' : String,
+
+	'start' : String,
+	'end': String,
+
+	'parentId': String
 });
 
 // export the model

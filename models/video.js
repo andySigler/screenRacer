@@ -5,7 +5,8 @@ var Schema = mongoose.Schema;
 var VideoSchema = new Schema({
 	'title' : String,
 	'url': String,
-	'id': String
+	
+	'parentId': String
 });
 
 // export the model
