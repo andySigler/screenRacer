@@ -38,6 +38,7 @@ app.get('/',routes.index);
 app.get('/video/*',routes.video);
 app.post('/newVideo',routes.newVideo);
 app.post('/newComment/*',routes.newComment);
+app.post('/newReply/*',routes.newReply);
 
 
 
