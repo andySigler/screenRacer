@@ -1,48 +1,128 @@
+///////////////////////////////////////////////////////
+///////////////////////////////////////////////////////
+///////////////////////////////////////////////////////
+
+var port = process.env.PORT || 5000;
+
 var express = require('express');
-var http = require('http');
-var path = require('path');
-var mongoose = require('mongoose');
-var moment = require('moment');
-
-//express stuff
 var app = express();
+var server = require('http').createServer(app);
+server.listen(port);
 
-//by not giving a first argument to .configure, this function applies
-//to the entire app
+var io = require('socket.io').listen(server);
+io.set('log level',1); //so there aren't constant debug messages
+
+var path = require('path');
+
+///////////////////////////////////////////////////////
+///////////////////////////////////////////////////////
+///////////////////////////////////////////////////////
+
 app.configure(function(){
-	app.set('port', process.env.PORT || 9000);
-
-	//where our template directory is
+	app.set('port', port);
 	app.set('views', __dirname + '/views');
-	//what compiles our pages from '/views' will be called 'html'
-	app.set ('view engine','html');
-	//looks inside our '/views' folder, sets the layout to our 'layout' file
-	app.set('layout','layout');
-	//that 'html' engine is technically the hogan-express engine
-	app.engine('html',require('hogan-express'));
+
+	app.set('view engine', 'html');
+	app.set('layout', 'layout');
+	app.engine('html', require('hogan-express'));
 
 	app.use(express.favicon());
-  	app.use(express.bodyParser());
-  	app.use(express.methodOverride());
-  	app.use(app.router);
-  	app.use(express.static(path.join(__dirname, 'public')));
-  	app.db = mongoose.connect(process.env.MONGOLAB_URI);
+	app.use(express.bodyParser());
+	app.use(express.methodOverride());
+
+	app.use(app.router);
+	app.use(express.static(path.join(__dirname, 'public')));
 });
 
+///////////////////////////////////////////////////////
+///////////////////////////////////////////////////////
+///////////////////////////////////////////////////////
 
+var routes = require('./routes/routes.js');
 
-//routing stuff
-var routes = require(__dirname + '/routes/index.js');
+app.get('/',routes.controller);
+app.get('/screen',routes.screen);
 
-app.get('/',routes.index);
-app.get('/video/*',routes.video);
-app.post('/newVideo',routes.newVideo);
-app.post('/newComment/*',routes.newComment);
-app.post('/newReply/*',routes.newReply);
+///////////////////////////////////////////////////////
+///////////////////////////////////////////////////////
+///////////////////////////////////////////////////////
 
+var screenSockets = [];
+var controllerSockets = [];
 
+io.sockets.on('connection', function(socket){
+	var isScreen = false;
 
-//and finally, make the server
-http.createServer(app).listen(app.get('port'),function(){
-	console.log('http server listening at port ' + app.get('port'));
+	//save what role the browser will play
+	socket.emit('id',{});
+	socket.on('id',function(data){
+		if(data.id==='screen'){
+			screenSockets.push(socket);
+			isScreen = true;
+			for(var s=0;s<controllerSockets.length;s++){
+				if(controllerSockets[s].currentScreen===screenSockets.length-1){
+					socket.emit('entry',{});						//tells current screen to start counting it's x/y values
+				}
+			}
+		}
+		else if(data.id==='controller' && controllerSockets.length<3){
+			socket.currentScreen = 0;										//save the current screen
+			socket.player = controllerSockets.length+1				//save which 'player' this controller is
+			controllerSockets.push(socket);
+			if(screenSockets.length>0){
+				screenSockets[socket.currentScreen].emit('entry',{});		//tells current screen to start counting it's x/y values
+			}
+		}
+	});
+
+	//pass on the data to this controller's screen
+	socket.on('controlData',function(data){
+		if(screenSockets.length>0){
+			screenSockets[socket.currentScreen].emit('controlData',{'x':data.x,'y':data.y});
+		}
+	});
+
+	//the 'passOn' message increments/decrements the current screen value
+	socket.on('passOn',function(data){
+		for(var n=0;n<screenSockets.length;n++){
+			if(screenSockets[n]===socket){
+				for(var b=0;b<controllerSockets.length;b++){
+					if(controllerSockets[b].currentScreen===n){
+						controllerSockets[b].currentScreen += data.value;
+						if(controllerSockets[b].currentScreen<0){
+							controllerSockets[b].currentScreen = screenSockets.length-1;
+						}
+						else if(controllerSockets[b].currentScreen===screenSockets.length){
+							controllerSockets[b].currentScreen = 0;
+						}
+						if(screenSockets.length>0){
+							screenSockets[controllerSockets[b].currentScreen].emit('entry',{'direction':data.value});			//tells current screen to start counting it's x/y values
+						}
+					}
+				}
+			}
+		}
+	});
+
+	//erase the socket from either array upon disconnection
+	socket.on('disconnect',function(){
+		if(isScreen){
+			for(var i=0;i<screenSockets.length;i++){
+				if(screenSockets[i]===socket){
+					screenSockets.splice(i,1);
+				}
+			}
+		}
+		else{
+			for(var i=0;i<controllerSockets.length;i++){
+				if(controllerSockets[i]===socket){
+					controllerSockets.splice(i,1);
+				}
+			}
+		}
+	});
 });
+
+///////////////////////////////////////////////////////
+///////////////////////////////////////////////////////
+///////////////////////////////////////////////////////

@@ -4,20 +4,17 @@
    Author's custom styles
    ========================================================================== */
 
-
-.videoContent{
-	margin-left:auto;
-	margin-right:auto;
-	width:70%;
+.trackpad{
+	border:solid;
 }
 
-
-
-
-
-
-
-
+.landscape{
+	border:solid;
+	margin-right: 0px;
+	margin-left: 0px;
+	margin-bottom: 0px;
+	margin-top: 0px;
+}
 
 
 
