@@ -2,47 +2,43 @@
 ////////////////////////////////////////////////
 ////////////////////////////////////////////////
 
+var ready = false;
+
 var socket = io.connect();
 
 socket.on('id',function(data){
-	socket.emit('id',{'id':'controller'})
+	socket.emit('id',{'id':'controller'});
 });
 
+socket.on('ready',function(data){
+	ready = true;
+});
+
+var color = '#'+RGB2HTML(rand(255),rand(255),rand(255));
+document.body.style.background = color;
+
 ////////////////////////////////////////////////
 ////////////////////////////////////////////////
 ////////////////////////////////////////////////
 
-var pad = document.getElementById('trackpad');
-
-pad.addEventListener('mousemove', function(evt) {
-    var mousePos = relMousePos(pad, evt);
-    if(isStarted){
-	    socket.emit('controlData',{'x':mousePos.x,'y':mousePos.y});
+window.ondeviceorientation = function(event) {
+	var y = (event.beta+90)/180;
+	if(ready){
+		socket.emit('controlData',{'y':y,'color':color});
 	}
-}, false);
+};
 
-function relMousePos(theDivv, evt) {
-    var rect = theDivv.getBoundingClientRect();
-    return {
-        x: (evt.clientX - rect.left) / rect.width,
-        y: (evt.clientY - rect.top) / rect.height
-    };
+////////////////////////////////////////////////
+////////////////////////////////////////////////
+////////////////////////////////////////////////
+
+function RGB2HTML(red, green, blue){
+    var decColor = red + 256 * green + 65536 * blue;
+    return decColor.toString(16);
 }
 
-////////////////////////////////////////////////
-////////////////////////////////////////////////
-////////////////////////////////////////////////
-
-var isStarted = false;
-
-function start(){
-	isStarted = !isStarted;
-	if(isStarted){
-		socket.emit('start',{});
-	}
-	else{
-		socket.emit('end',{});
-	}
+function rand(max){
+	return Math.floor(Math.random()*max);
 }
 
 ////////////////////////////////////////////////

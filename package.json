@@ -1,6 +1,6 @@
 {
 	"name": "screenRacer",
-	"version": "0.0.1",
+	"version": "0.0.1-2",
 	"dependencies": {
 		"express": "3.0.0rc5",
 		"hogan-express": "0.3.3",
@@ -9,5 +9,9 @@
 	"engines": {
 		"node": "0.8.x",
 		"npm": "1.1.x"
+	},
+	"subdomain": "screenRacer",
+	"scripts": {
+		"start": "node app.js"
 	}
 }

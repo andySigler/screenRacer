@@ -47,76 +47,73 @@ app.get('/screen',routes.screen);
 ///////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////
 
-var screenSockets = [];
-var controllerSockets = [];
+var id=0;
 
-io.sockets.on('connection', function(socket){
-	var isScreen = false;
+var all = {
+	'screen':[],
+	'controller':{}
+};
 
-	//save what role the browser will play
-	socket.emit('id',{});
-	socket.on('id',function(data){
+io.sockets.on('connection', function(s){
+
+	var type;
+	var speed = 5;
+	var accel = 1.01;
+
+	//initialization stuff
+	s.emit('id',{});
+	s.on('id',function(data){
+
+		s.index = 0;
+		type = data.id;
+
 		if(data.id==='screen'){
-			screenSockets.push(socket);
-			isScreen = true;
-			for(var s=0;s<controllerSockets.length;s++){
-				if(controllerSockets[s].currentScreen===screenSockets.length-1){
-					socket.emit('entry',{});						//tells current screen to start counting it's x/y values
-				}
-			}
+			all[type].push(s); //add screen to an array
 		}
-		else if(data.id==='controller' && controllerSockets.length<3){
-			socket.currentScreen = 0;										//save the current screen
-			socket.player = controllerSockets.length+1				//save which 'player' this controller is
-			controllerSockets.push(socket);
-			if(screenSockets.length>0){
-				screenSockets[socket.currentScreen].emit('entry',{});		//tells current screen to start counting it's x/y values
+		else if(data.id==='controller'){
+			all[type][s.id] = s; //save controller according to ID
+			s.emit('ready',{});
+		}
+	});
+
+	//messages from the iPhone
+	s.on('controlData',function(data){
+
+		if(all.screen.length>0){
+
+			data.id = s.id;
+			data.speed = speed;
+			speed*=accel;
+			if(speed>100) speed = 5; //for testing
+
+			//use the index of our saved copy, not the original
+			if(all.controller[s.id]){
+				if(all.screen[all.controller[s.id].index]===undefined){
+					all.controller[s.id].index = 0;
+				}
+				all.screen[all.controller[s.id].index].emit('controlData',data);
 			}
 		}
 	});
 
-	//pass on the data to this controller's screen
-	socket.on('controlData',function(data){
-		if(screenSockets.length>0){
-			screenSockets[socket.currentScreen].emit('controlData',{'x':data.x,'y':data.y});
-		}
+	//sent from a screen when the ball is off
+	s.on('pass',function(data){
+		all.controller[data.id].index+=1;
 	});
 
-	//the 'passOn' message increments/decrements the current screen value
-	socket.on('passOn',function(data){
-		for(var n=0;n<screenSockets.length;n++){
-			if(screenSockets[n]===socket){
-				for(var b=0;b<controllerSockets.length;b++){
-					if(controllerSockets[b].currentScreen===n){
-						controllerSockets[b].currentScreen += data.value;
-						if(controllerSockets[b].currentScreen<0){
-							controllerSockets[b].currentScreen = screenSockets.length-1;
-						}
-						else if(controllerSockets[b].currentScreen===screenSockets.length){
-							controllerSockets[b].currentScreen = 0;
-						}
-						if(screenSockets.length>0){
-							screenSockets[controllerSockets[b].currentScreen].emit('entry',{'direction':data.value});			//tells current screen to start counting it's x/y values
-						}
-					}
-				}
-			}
+	s.on('disconnect',function(){
+		//if controller, delete it's ball, and erase from the storage
+		if(all.controller[s.id]){
+			s.broadcast.emit('delete',{'id':s.id});
+			delete all.controller[s.id];
 		}
-	});
 
-	//erase the socket from either array upon disconnection
-	socket.on('disconnect',function(){
-		if(isScreen){
-			for(var i=0;i<screenSockets.length;i++){
-				if(screenSockets[i]===socket){
-					screenSockets.splice(i,1);
-				}
-			}
-		}
+		//if it's a screen, just delete it
 		else{
-			for(var i=0;i<controllerSockets.length;i++){
-				if(controllerSockets[i]===socket){
-					controllerSockets.splice(i,1);
+			for(var i=0;i<all.screen.length;i++){
+				if(all.screen[i].id===s.id){
+					all[type].splice(i,1);
+					break;
 				}
 			}
 		}
