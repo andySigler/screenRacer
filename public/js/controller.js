@@ -2,30 +2,30 @@
 ////////////////////////////////////////////////
 ////////////////////////////////////////////////
 
-var ready = false;
+var speed = 0;
+var y = .5;
 
 var socket = io.connect();
 
-socket.on('id',function(data){
-	socket.emit('id',{'id':'controller'});
-});
-
-socket.on('ready',function(data){
-	ready = true;
-});
-
 var color = '#'+RGB2HTML(rand(255),rand(255),rand(255));
 document.body.style.background = color;
+
+socket.on('id',function(data){
+	socket.emit('id',{'id':'user','color':color});
+});
+
+socket.on('update',function(data){
+	socket.emit('update',{'speed':speed,'y':y});
+	document.getElementById('test').innerHTML = 'speed: '+speed+' - y: '+y;
+});
 
 ////////////////////////////////////////////////
 ////////////////////////////////////////////////
 ////////////////////////////////////////////////
 
 window.ondeviceorientation = function(event) {
-	var y = (event.beta+90)/180;
-	if(ready){
-		socket.emit('controlData',{'y':y,'color':color});
-	}
+	y = (event.beta+90)/180;
+	speed = event.gamma/90;
 };
 
 ////////////////////////////////////////////////
@@ -41,6 +41,6 @@ function rand(max){
 	return Math.floor(Math.random()*max);
 }
 
-////////////////////////////////////////////////
-////////////////////////////////////////////////
-////////////////////////////////////////////////
+//////////////////////////////////////////////////
+//////////////////////////////////////////////////
+//////////////////////////////////////////////////

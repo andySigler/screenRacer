@@ -47,78 +47,105 @@ app.get('/screen',routes.screen);
 ///////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////
 
-var id=0;
-
-var all = {
-	'screen':[],
-	'controller':{}
-};
+var user = {};
+var screens = [];
 
 io.sockets.on('connection', function(s){
 
-	var type;
-	var speed = 5;
-	var accel = 1.01;
-
-	//initialization stuff
+	//initialize the socket, either user or screen
 	s.emit('id',{});
 	s.on('id',function(data){
-
-		s.index = 0;
-		type = data.id;
-
-		if(data.id==='screen'){
-			all[type].push(s); //add screen to an array
+		if(data.id==='user'){
+			s.index = 0; //what screen
+			s.x = .5;
+			s.y = .5;
+			s.speed = 0;
+			s.color = data.color;
+			user[s.id] = s;
+			s.emit('update',{});
 		}
-		else if(data.id==='controller'){
-			all[type][s.id] = s; //save controller according to ID
-			s.emit('ready',{});
+		else if(data.id==='screen'){
+			screens.push(s);
+			s.emit('frame',{});
 		}
 	});
 
-	//messages from the iPhone
-	s.on('controlData',function(data){
+	//handshake method for the users
+	s.on('update',function(data){
+		updateUser(s.id,data);
+		s.emit('update',{});
+	});
 
-		if(all.screen.length>0){
+	//handshake method for the screens
+	s.on('frame',function(){
 
-			data.id = s.id;
-			data.speed = speed;
-			speed*=accel;
-			if(speed>100) speed = 5; //for testing
+		var myUsers = [];
 
-			//use the index of our saved copy, not the original
-			if(all.controller[s.id]){
-				if(all.screen[all.controller[s.id].index]===undefined){
-					all.controller[s.id].index = 0;
+		for(var h=0;h<screens.length;h++){
+			if(screens[h].id===s.id){
+				for(var u in user){
+					if(user[u].index===h){
+						var tempUser = {
+							'x':user[u].x,
+							'y':user[u].y,
+							'color':user[u].color
+						};
+						myUsers.push(tempUser);
+					}
 				}
-				all.screen[all.controller[s.id].index].emit('controlData',data);
+				break;
 			}
 		}
+		s.emit('frame',{'myUsers':myUsers});
 	});
 
-	//sent from a screen when the ball is off
-	s.on('pass',function(data){
-		all.controller[data.id].index+=1;
-	});
-
+	//delete the user or screen when they leave
 	s.on('disconnect',function(){
-		//if controller, delete it's ball, and erase from the storage
-		if(all.controller[s.id]){
-			s.broadcast.emit('delete',{'id':s.id});
-			delete all.controller[s.id];
+		if(user[s.id]){
+			delete user[s.id];
+			console.log('lost a user');
 		}
-
-		//if it's a screen, just delete it
 		else{
-			for(var i=0;i<all.screen.length;i++){
-				if(all.screen[i].id===s.id){
-					all[type].splice(i,1);
+			for(var i=0;i<screens.length;i++){
+				if(screens[i].id===s.id){
+					screens.splice(i,1);
+					console.log('lost a screen');
 					break;
 				}
 			}
 		}
 	});
 });
+
+///////////////////////////////////////////////////////
+///////////////////////////////////////////////////////
+///////////////////////////////////////////////////////
+
+var maxSpeed = 0.005;
+
+function updateUser(id,data){
+	if(screens.length>0){
+
+		user[id].speed = data.speed*maxSpeed;
+		user[id].x += user[id].speed;
+		user[id].y = data.y;
+
+		if(user[id].x>=1){
+			user[id].index++;
+			user[id].x = 0;
+			if(user[id].index>=screens.length){
+				user[id].index=0;
+			}
+		}
+		else if(user[id].x<0){
+			user[id].index--;
+			user[id].x = 1;
+			if(user[id].index<0){
+				user[id].index = screens.length-1;;
+			}
+		}
+	}
+}
 
 ///////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////
