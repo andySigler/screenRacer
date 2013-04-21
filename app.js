@@ -52,6 +52,8 @@ var screens = [];
 
 io.sockets.on('connection', function(s){
 
+	var last;
+
 	//initialize the socket, either user or screen
 	s.emit('id',{});
 	s.on('id',function(data){
@@ -63,17 +65,34 @@ io.sockets.on('connection', function(s){
 			s.color = data.color;
 			user[s.id] = s;
 			s.emit('update',{});
+			//s.emit('time',{'sentTime':0,'toServerDelay': 0});
 		}
 		else if(data.id==='screen'){
 			screens.push(s);
 			s.emit('frame',{});
 		}
+		var d = new Date();
+		last = d.getTime();
 	});
 
 	//handshake method for the users
 	s.on('update',function(data){
+		var d = new Date();
+		var now = d.getTime();
+
 		updateUser(s.id,data);
+
 		s.emit('update',{});
+	});
+
+	//for debugging
+	s.on('time',function(data){
+		var d = new Date();
+		var now = d.getTime();
+
+		updateUser(s.id,data);
+
+		s.emit('time',{'sentTime':now,'toServerDelay': now-data.sentTime});
 	});
 
 	//handshake method for the screens
@@ -121,7 +140,17 @@ io.sockets.on('connection', function(s){
 ///////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////
 
-var maxSpeed = 0.005;
+function loop(){
+	for(var u in user){
+		user[u]
+	}
+}
+
+///////////////////////////////////////////////////////
+///////////////////////////////////////////////////////
+///////////////////////////////////////////////////////
+
+var maxSpeed = 0.1;
 
 function updateUser(id,data){
 	if(screens.length>0){

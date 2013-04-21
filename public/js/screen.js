@@ -23,9 +23,11 @@ socket.on('frame',function(data){
 		var y = data.myUsers[i].y*theHeight;
 		ctx.fillRect(x,y,30,30);
 		document.getElementById('test').innerHTML = 'x: '+x+' - y: '+y;
+		console.log(data);
 	}
-
-	socket.emit('frame',{});
+	// setTimeout(function(){
+		socket.emit('frame',{});
+	// },30);
 });
 
 //////////////////////////////////////////////////
