@@ -1,5 +1,64 @@
-<div id="test"></div>
-<canvas id="landscape" class="landscape"></canvas>
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset="utf-8">
+        <title>Screen</title>
+	</head>
+	<body style="backgroundColor:#000000">
+		<div id="test"></div>
+		<canvas id="landscape" class="landscape"></canvas>
+		<script src="/socket.io/socket.io.js"></script>
+		<script>
+		//////////////////////////////////////////////////
+		//////////////////////////////////////////////////
+		//////////////////////////////////////////////////
+		
+		var balls = {};
+		var maxSpeed = 20;
 
-<script src="/socket.io/socket.io.js"></script>
-<script src="/js/screen.js"></script>
+		var socket = io.connect();
+
+		socket.on('id',function(data){
+			socket.emit('id',{'id':'screen'});
+		});
+
+		//////////////////////////////////////////////////
+		//////////////////////////////////////////////////
+		//////////////////////////////////////////////////
+
+		socket.on('frame',function(data){
+
+			var ctx = c.getContext('2d');
+			ctx.fillStyle = '#000000';
+			ctx.fillRect(0,0,theWidth,theHeight);
+
+			for(var i in data.myUsers){
+				ctx.fillStyle = data.myUsers[i].color;
+				var x = data.myUsers[i].x*theWidth;
+				var y = data.myUsers[i].y*theHeight;
+				ctx.fillRect(x,y,30,30);
+				
+			}
+			// setTimeout(function(){
+				socket.emit('frame',{});
+			// },30);
+		});
+
+		//////////////////////////////////////////////////
+		//////////////////////////////////////////////////
+		//////////////////////////////////////////////////
+
+		var c = document.getElementById('landscape');
+
+		var theWidth = window.innerWidth-7;
+		var theHeight = window.innerHeight-7;
+
+		c.width = theWidth;
+		c.height = theHeight;
+
+		//////////////////////////////////////////////////
+		//////////////////////////////////////////////////
+		//////////////////////////////////////////////////
+		</script>
+	</body>
+</html>

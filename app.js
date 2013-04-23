@@ -3,45 +3,57 @@
 ///////////////////////////////////////////////////////
 
 var port = process.env.PORT || 5000;
-
-var express = require('express');
-var app = express();
-var server = require('http').createServer(app);
-server.listen(port);
-
-var io = require('socket.io').listen(server);
-io.set('log level',1); //so there aren't constant debug messages
-
-var path = require('path');
+var fs = require('fs');
+var url = require('url');
 
 ///////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////
 
-app.configure(function(){
-	app.set('port', port);
-	app.set('views', __dirname + '/views');
+var controllerHTML;
+var screenHTML;
 
-	app.set('view engine', 'html');
-	app.set('layout', 'layout');
-	app.engine('html', require('hogan-express'));
+fs.readFile('./views/controller.html',function(error,html){
+	if(error){
+		console.log('error loading controller file');
+	}
+	else{
+		controllerHTML = html;
+	}
+});
 
-	app.use(express.favicon());
-	app.use(express.bodyParser());
-	app.use(express.methodOverride());
-
-	app.use(app.router);
-	app.use(express.static(path.join(__dirname, 'public')));
+fs.readFile('./views/screen.html',function(error,html){
+	if(error){
+		console.log('error loading screen file');
+	}
+	else{
+		screenHTML = html;
+	}
 });
 
 ///////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////
 
-var routes = require('./routes/routes.js');
+var server = require('http').createServer(function(request,response){
+	var pathname = url.parse(request.url).pathname;
+	response.writeHead(200, {"Content-Type": "text/html"});
+	if(pathname==='/screen'){
+		response.write(screenHTML);
+	}
+	else if(pathname==='/'){
+		response.write(controllerHTML);
+	}
+	else{
+		response.write('yo no se');
+	}
+	response.end();
+});
 
-app.get('/',routes.controller);
-app.get('/screen',routes.screen);
+server.listen(port);
+
+var io = require('socket.io').listen(server);
+io.set('log level',1); //so there aren't constant debug messages
 
 ///////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////
@@ -58,44 +70,31 @@ io.sockets.on('connection', function(s){
 	s.emit('id',{});
 	s.on('id',function(data){
 		if(data.id==='user'){
-			s.index = 0; //what screen
-			s.x = .5;
+			s.index = 0; //what screen are we on?
+			s.x = .5; //where are we on that screen?
 			s.y = .5;
+			s.px = .5; //saving previous locations for filtering
+			s.py = .5;
 			s.speed = 0;
 			s.color = data.color;
 			user[s.id] = s;
-			s.emit('update',{});
-			//s.emit('time',{'sentTime':0,'toServerDelay': 0});
+			s.emit('update',{}); //start the handshake method
 		}
 		else if(data.id==='screen'){
 			screens.push(s);
 			s.emit('frame',{});
 		}
-		var d = new Date();
-		last = d.getTime();
 	});
 
-	//handshake method for the users
+	//handshake method for the controlling broswers
 	s.on('update',function(data){
-		var d = new Date();
-		var now = d.getTime();
 
 		updateUser(s.id,data);
 
 		s.emit('update',{});
 	});
 
-	//for debugging
-	s.on('time',function(data){
-		var d = new Date();
-		var now = d.getTime();
-
-		updateUser(s.id,data);
-
-		s.emit('time',{'sentTime':now,'toServerDelay': now-data.sentTime});
-	});
-
-	//handshake method for the screens
+	//handshake method for the screen browser
 	s.on('frame',function(){
 
 		var myUsers = [];
@@ -140,24 +139,18 @@ io.sockets.on('connection', function(s){
 ///////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////
 
-function loop(){
-	for(var u in user){
-		user[u]
-	}
-}
-
-///////////////////////////////////////////////////////
-///////////////////////////////////////////////////////
-///////////////////////////////////////////////////////
-
-var maxSpeed = 0.1;
+var maxSpeed = 0.01;
+var xSlide = 10;
+var ySlide = 150;
 
 function updateUser(id,data){
 	if(screens.length>0){
 
 		user[id].speed = data.speed*maxSpeed;
-		user[id].x += user[id].speed;
-		user[id].y = data.y;
+
+		//filtering
+		user[id].x = user[id].x + (((user[id].x + user[id].speed)-user[id].x)/xSlide);
+		user[id].y = user[id].y + ((data.y-user[id].y)/ySlide);
 
 		if(user[id].x>=1){
 			user[id].index++;
