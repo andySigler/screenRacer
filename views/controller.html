@@ -25,6 +25,7 @@
 		document.body.style.background = color;
 
 		socket.onmessage = function(msg){
+			console.log('got a message');
 			var parsedMsg = JSON.parse(msg.data);
 			if(parsedMsg.tag==='id'){
 				var response = {

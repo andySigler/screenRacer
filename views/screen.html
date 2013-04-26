@@ -17,6 +17,7 @@
 		var socket = new WebSocket('ws://localhost:8080');
 
 		socket.onmessage = function(msg){
+			console.log('got a message');
 			var parsedMsg = JSON.parse(msg.data);
 			if(parsedMsg.tag==='frame'){
 				frame(parsedMsg);

@@ -1,6 +1,6 @@
 {
 	"name": "screenRacer",
-	"version": "0.0.3",
+	"version": "0.0.3-3",
 	"dependencies": {
 		"ws": "0.4.x"
 	},
