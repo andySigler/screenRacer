@@ -5,17 +5,16 @@
         <title>Controller</title>
 	</head>
 	<body>
-		<div id="test"></div>
-		<script src="/socket.io/socket.io.js"></script>
+		<!-- <script src="/socket.io/socket.io.js"></script> -->
 		<script>
 		////////////////////////////////////////////////
 		////////////////////////////////////////////////
 		////////////////////////////////////////////////
 
-		var speed = 0;
-		var y = .5;
+		var xSpeed = 0;
+		var ySpeed = 0;
 
-		var socket = io.connect();
+		var socket = new WebSocket('ws://localhost:8080');
 
 		var r = rand(255);
 		var g = rand(255);
@@ -24,37 +23,35 @@
 		var color = '#'+RGB2HTML(r,g,b);
 		var textColor = '#'+RGB2HTML(255-r,255-g,255-b);
 		document.body.style.background = color;
-		document.getElementById('test').style.color = textColor;
 
-		socket.on('id',function(data){
-			socket.emit('id',{'id':'user','color':color});
-		});
+		socket.onmessage = function(msg){
+			var parsedMsg = JSON.parse(msg.data);
+			if(parsedMsg.tag==='id'){
+				var response = {
+					'tag':'id',
+					'id':'user',
+					'color':color
+				};
 
-		socket.on('update',function(data){
+				socket.send(JSON.stringify(response));
+			}
 
-			socket.emit('update',{'speed':speed,'y':y});
-		});
-
-		socket.on('time',function(data){
-			var d = new Date();
-			var now = d.getTime();
-
-			var toUserDelay = now-data.sentTime;
-			
-			console.log('toServer: '+data.toServerDelay+' --- toUserDelay: '+toUserDelay);
-
-			socket.emit('time',{'sentTime': now});
-		});
+			else if(parsedMsg.tag==='update'){
+				socket.send(JSON.stringify({
+					'tag':'update',
+					'xSpeed':xSpeed,
+					'ySpeed':ySpeed
+				}));
+			}
+		};
 
 		////////////////////////////////////////////////
 		////////////////////////////////////////////////
 		////////////////////////////////////////////////
 
 		window.ondeviceorientation = function(event) {
-			y = (event.beta/45)+.5;
-			if(y<0) y=0;
-			else if(y>1) y=1;
-			speed = event.gamma/90;
+			ySpeed = event.beta/90
+			xSpeed = event.gamma/90;
 		};
 
 		////////////////////////////////////////////////

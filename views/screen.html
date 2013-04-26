@@ -5,9 +5,7 @@
         <title>Screen</title>
 	</head>
 	<body style="backgroundColor:#000000">
-		<div id="test"></div>
 		<canvas id="landscape" class="landscape"></canvas>
-		<script src="/socket.io/socket.io.js"></script>
 		<script>
 		//////////////////////////////////////////////////
 		//////////////////////////////////////////////////
@@ -16,17 +14,28 @@
 		var balls = {};
 		var maxSpeed = 20;
 
-		var socket = io.connect();
+		var socket = new WebSocket('ws://localhost:8080');
 
-		socket.on('id',function(data){
-			socket.emit('id',{'id':'screen'});
-		});
+		socket.onmessage = function(msg){
+			var parsedMsg = JSON.parse(msg.data);
+			if(parsedMsg.tag==='frame'){
+				frame(parsedMsg);
+			}
+			else if(parsedMsg.tag==='id'){
+				var response = {
+					'tag':'id',
+					'id':'screen'
+				};
+
+				socket.send(JSON.stringify(response));
+			}
+		};
 
 		//////////////////////////////////////////////////
 		//////////////////////////////////////////////////
 		//////////////////////////////////////////////////
 
-		socket.on('frame',function(data){
+		function frame(data){
 
 			var ctx = c.getContext('2d');
 			ctx.fillStyle = '#000000';
@@ -39,10 +48,12 @@
 				ctx.fillRect(x,y,30,30);
 				
 			}
-			// setTimeout(function(){
-				socket.emit('frame',{});
-			// },30);
-		});
+			var response = {
+				'tag':'frame'
+			};
+
+			socket.send(JSON.stringify(response));
+		};
 
 		//////////////////////////////////////////////////
 		//////////////////////////////////////////////////

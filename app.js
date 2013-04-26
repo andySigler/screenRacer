@@ -1,8 +1,10 @@
+
+
 ///////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////
 
-var port = process.env.PORT || 5000;
+var port = 5000;
 var fs = require('fs');
 var url = require('url');
 
@@ -10,50 +12,52 @@ var url = require('url');
 ///////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////
 
-var controllerHTML;
-var screenHTML;
-
-fs.readFile('./views/controller.html',function(error,html){
-	if(error){
-		console.log('error loading controller file');
-	}
-	else{
-		controllerHTML = html;
-	}
-});
-
-fs.readFile('./views/screen.html',function(error,html){
-	if(error){
-		console.log('error loading screen file');
-	}
-	else{
-		screenHTML = html;
-	}
-});
-
 ///////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////
 
 var server = require('http').createServer(function(request,response){
+
 	var pathname = url.parse(request.url).pathname;
 	response.writeHead(200, {"Content-Type": "text/html"});
+
 	if(pathname==='/screen'){
-		response.write(screenHTML);
+			fs.readFile('./views/screen.html',function(error,html){
+			if(error){
+				console.log('error loading screen file');
+				console.log(error);
+				response.write('error loading screen file');
+				response.end();
+			}
+			else{
+				response.write(html);
+				response.end();
+			}
+		});
 	}
+
 	else if(pathname==='/'){
-		response.write(controllerHTML);
+			fs.readFile('./views/controller.html',function(error,html){
+			if(error){
+				console.log('error loading controller file');
+				console.log(error);
+				response.write('error loading controller file');
+				response.end();
+			}
+			else{
+				response.write(html);
+				response.end();
+			}
+		});
 	}
+
 	else{
 		response.write('yo no se');
+		response.end();
 	}
-	response.end();
 });
 
 server.listen(port);
-
-var io = require('socket.io').listen(server);
-io.set('log level',1); //so there aren't constant debug messages
 
 ///////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////
@@ -62,40 +66,68 @@ io.set('log level',1); //so there aren't constant debug messages
 var user = {};
 var screens = [];
 
-io.sockets.on('connection', function(s){
+var id = 0;
+
+var WebSocketServer = require('ws').Server;
+var wss = new WebSocketServer({'port': 8080});
+
+wss.on('connection', function(s){
+	id++;
 
 	var last;
 
+	s.id = id;
+
 	//initialize the socket, either user or screen
-	s.emit('id',{});
-	s.on('id',function(data){
+	s.send(JSON.stringify({'tag':'id'}));
+
+	s.on('message',function(msg){
+
+		var parsedMsg = JSON.parse(msg);
+		if(parsedMsg.tag==='id'){
+			setID(parsedMsg);
+		}
+		else if(parsedMsg.tag==='update'){
+			updateUser(parsedMsg);
+		}
+		else if(parsedMsg.tag==='frame'){
+			frame(parsedMsg);
+		}
+	});
+
+	function setID(data){
 		if(data.id==='user'){
 			s.index = 0; //what screen are we on?
 			s.x = .5; //where are we on that screen?
 			s.y = .5;
 			s.px = .5; //saving previous locations for filtering
 			s.py = .5;
-			s.speed = 0;
+			s.xSpeed = 0;
+			s.ySpeed = 0;
 			s.color = data.color;
 			user[s.id] = s;
-			s.emit('update',{}); //start the handshake method
+			s.send(JSON.stringify({'tag':'update'})); //start the handshake method
 		}
 		else if(data.id==='screen'){
 			screens.push(s);
-			s.emit('frame',{});
+			s.send(JSON.stringify({'tag':'frame'}));
 		}
-	});
+	};
 
 	//handshake method for the controlling broswers
-	s.on('update',function(data){
+	function updateUser(data){
 
-		updateUser(s.id,data);
+		var maxSpeed = 1;
 
-		s.emit('update',{});
-	});
+
+		user[s.id].xSpeed = data.xSpeed*maxSpeed;
+		user[s.id].ySpeed = data.ySpeed*maxSpeed;
+
+		s.send(JSON.stringify({'tag':'update'}));
+	};
 
 	//handshake method for the screen browser
-	s.on('frame',function(){
+	function frame(data){
 
 		var myUsers = [];
 
@@ -114,11 +146,11 @@ io.sockets.on('connection', function(s){
 				break;
 			}
 		}
-		s.emit('frame',{'myUsers':myUsers});
-	});
+		s.send(JSON.stringify({'tag':'frame','myUsers':myUsers}));
+	};
 
 	//delete the user or screen when they leave
-	s.on('disconnect',function(){
+	s.on('close',function(){
 		if(user[s.id]){
 			delete user[s.id];
 			console.log('lost a user');
@@ -139,35 +171,32 @@ io.sockets.on('connection', function(s){
 ///////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////
 
-var maxSpeed = 0.01;
 var xSlide = 10;
-var ySlide = 150;
+var ySlide = 15;
 
-function updateUser(id,data){
-	if(screens.length>0){
-
-		user[id].speed = data.speed*maxSpeed;
+setInterval(function updateUser(){
+	for(var i in user){
 
 		//filtering
-		user[id].x = user[id].x + (((user[id].x + user[id].speed)-user[id].x)/xSlide);
-		user[id].y = user[id].y + ((data.y-user[id].y)/ySlide);
+		user[i].x = user[i].x + (((user[i].x + user[i].xSpeed)-user[i].x)/xSlide);
+		user[i].y = user[i].y + (((user[i].y + user[i].ySpeed)-user[i].y)/ySlide);
 
-		if(user[id].x>=1){
-			user[id].index++;
-			user[id].x = 0;
-			if(user[id].index>=screens.length){
-				user[id].index=0;
+		if(user[i].x>=1){
+			user[i].index++;
+			user[i].x = 0;
+			if(user[i].index>=screens.length){
+				user[i].index=0;
 			}
 		}
-		else if(user[id].x<0){
-			user[id].index--;
-			user[id].x = 1;
-			if(user[id].index<0){
-				user[id].index = screens.length-1;;
+		else if(user[i].x<0){
+			user[i].index--;
+			user[i].x = 1;
+			if(user[i].index<0){
+				user[i].index = screens.length-1;;
 			}
 		}
 	}
-}
+},30);
 
 ///////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////
