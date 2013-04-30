@@ -14,6 +14,8 @@
 		var xSpeed = 0;
 		var ySpeed = 0;
 
+		var ready = false;
+
 		var socket = new WebSocket('ws://localhost:8080');
 
 		var r = rand(255);
@@ -38,11 +40,7 @@
 			}
 
 			else if(parsedMsg.tag==='update'){
-				socket.send(JSON.stringify({
-					'tag':'update',
-					'xSpeed':xSpeed,
-					'ySpeed':ySpeed
-				}));
+				ready = true;
 			}
 		};
 
@@ -53,6 +51,14 @@
 		window.ondeviceorientation = function(event) {
 			ySpeed = event.beta/90
 			xSpeed = event.gamma/90;
+			if(ready){
+				socket.send(JSON.stringify({
+					'tag':'update',
+					'xSpeed':xSpeed,
+					'ySpeed':ySpeed
+				}));
+				ready = false;
+			}
 		};
 
 		////////////////////////////////////////////////

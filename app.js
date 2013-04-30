@@ -12,10 +12,6 @@ var url = require('url');
 ///////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////
 
-///////////////////////////////////////////////////////
-///////////////////////////////////////////////////////
-///////////////////////////////////////////////////////
-
 var server = require('http').createServer(function(request,response){
 
 	var pathname = url.parse(request.url).pathname;
@@ -72,12 +68,9 @@ var WebSocketServer = require('ws').Server;
 var wss = new WebSocketServer({'port': 8080});
 
 wss.on('connection', function(s){
-	console.log('A;SLDKFJ');
+
+	s.id = id; //give it an arbitrary id that increments
 	id++;
-
-	var last;
-
-	s.id = id;
 
 	//initialize the socket, either user or screen
 	s.send(JSON.stringify({'tag':'id'}));
@@ -86,73 +79,129 @@ wss.on('connection', function(s){
 
 		var parsedMsg = JSON.parse(msg);
 		if(parsedMsg.tag==='id'){
-			setID(parsedMsg);
+			setID(parsedMsg); //get the id (screen or user)
 		}
 		else if(parsedMsg.tag==='update'){
-			updateUser(parsedMsg);
+			updateUser(parsedMsg); //get speed from user, and pass on to current screen
 		}
 		else if(parsedMsg.tag==='frame'){
 			frame(parsedMsg);
 		}
+		else if(parsedMsg.tag==='death'){
+			onDeath(parsedMsg)
+		}
 	});
+
+	//passing on the birth message to the next screen if we've moved on
+	function onDeath(msg){
+		for(var b=0;b<screens.length;b++){
+			//find this screen's location in the array, and send to the next one (left or right)
+			if(screens[b].id===s.id){
+
+				var tempIndex;
+
+				//the next index depends on which direction we're moving
+				if(msg.x<.5){
+					tempIndex = b+1;
+					if(tempIndex===screens.length){
+						tempIndex=0;
+					}
+				}
+				else if(msg.x>.5){
+					tempIndex = b-1;
+					if(tempIndex<0) {
+						tempIndex=screens.length-1;
+					}
+				}
+
+				sendBirth(msg.userName,tempIndex,msg.x,msg.y);
+				break;
+			}
+		}
+	}
 
 	function setID(data){
 		if(data.id==='user'){
 			s.index = 0; //what screen are we on?
-			s.x = .5; //where are we on that screen?
-			s.y = .5;
-			s.px = .5; //saving previous locations for filtering
-			s.py = .5;
 			s.xSpeed = 0;
 			s.ySpeed = 0;
 			s.color = data.color;
 			user[s.id] = s;
 			s.send(JSON.stringify({'tag':'update'})); //start the handshake method
+			if(screens.length>0){
+				sendBirth(s.id,s.index,.5,.5);
+			}
 		}
 		else if(data.id==='screen'){
 			screens.push(s);
-			s.send(JSON.stringify({'tag':'frame'}));
+			screenBirth();
 		}
 	};
 
 	//handshake method for the controlling broswers
 	function updateUser(data){
 
-		var maxSpeed = 1;
+		user[s.id].xSpeed = data.xSpeed;
+		user[s.id].ySpeed = data.ySpeed;
 
+		if(screens[user[s.id].index]){
 
-		user[s.id].xSpeed = data.xSpeed*maxSpeed;
-		user[s.id].ySpeed = data.ySpeed*maxSpeed;
+			//send the new speed to the specified screen
+			screens[user[s.id].index].send(JSON.stringify({
+				'tag':'updateSpeeds',
+				'xSpeed': user[s.id].xSpeed,
+				'ySpeed': user[s.id].ySpeed,
+				'userName': s.id
+			}));
+		}
+		else if(screens.length>0){
+			user[s.id].index=0;
+			console.log('changed this user\s screen index');
+		}
+		else{
+			console.log('shit did not work');
+			console.log(screens.length);
+		}
 
+		// tell controller we're ready for more
 		s.send(JSON.stringify({'tag':'update'}));
 	};
 
-	//handshake method for the screen browser
-	function frame(data){
-
-		var myUsers = [];
-
-		for(var h=0;h<screens.length;h++){
-			if(screens[h].id===s.id){
-				for(var u in user){
-					if(user[u].index===h){
-						var tempUser = {
-							'x':user[u].x,
-							'y':user[u].y,
-							'color':user[u].color
-						};
-						myUsers.push(tempUser);
-					}
-				}
-				break;
+	//if this is a new screen, loop through all users, and send birth message if needed
+	function screenBirth(){
+		for(var u in user){
+			//if any user's index is the newest screen, birth a user on that client
+			if(user[u].index<=screens.length-1){
+				//initialize a new user on the screen
+				sendBirth(u,user[u].index,0.5,0.5);
 			}
 		}
-		s.send(JSON.stringify({'tag':'frame','myUsers':myUsers}));
-	};
+	}
+
+	//creates a user ball on a screen
+	function sendBirth(userID,newScreenIndex,x,y){
+		console.log('birthed a new user on screen '+newScreenIndex);
+		if(screens[newScreenIndex]){
+			user[userID].index = newScreenIndex;
+			screens[newScreenIndex].send(JSON.stringify({
+				'tag':'birth',
+				'userName': userID,
+				'xSpeed': user[userID].xSpeed,
+				'ySpeed': user[userID].ySpeed,
+				'color': user[userID].color,
+				'x': x,
+				'y': y
+			}));
+		}
+	}
 
 	//delete the user or screen when they leave
 	s.on('close',function(){
-		if(user[s.id]){
+		if(user[s.id] && screens[user[s.id].index]){
+			screens[user[s.id].index].send(JSON.stringify({
+				'tag':'death',
+				'userName':s.id
+			}));
 			delete user[s.id];
 			console.log('lost a user');
 		}
@@ -161,43 +210,13 @@ wss.on('connection', function(s){
 				if(screens[i].id===s.id){
 					screens.splice(i,1);
 					console.log('lost a screen');
+					screenBirth();
 					break;
 				}
 			}
 		}
 	});
 });
-
-///////////////////////////////////////////////////////
-///////////////////////////////////////////////////////
-///////////////////////////////////////////////////////
-
-var xSlide = 10;
-var ySlide = 15;
-
-setInterval(function updateUser(){
-	for(var i in user){
-
-		//filtering
-		user[i].x = user[i].x + (((user[i].x + user[i].xSpeed)-user[i].x)/xSlide);
-		user[i].y = user[i].y + (((user[i].y + user[i].ySpeed)-user[i].y)/ySlide);
-
-		if(user[i].x>=1){
-			user[i].index++;
-			user[i].x = 0;
-			if(user[i].index>=screens.length){
-				user[i].index=0;
-			}
-		}
-		else if(user[i].x<0){
-			user[i].index--;
-			user[i].x = 1;
-			if(user[i].index<0){
-				user[i].index = screens.length-1;;
-			}
-		}
-	}
-},30);
 
 ///////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////

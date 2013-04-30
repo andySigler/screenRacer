@@ -11,18 +11,15 @@
 		//////////////////////////////////////////////////
 		//////////////////////////////////////////////////
 		
-		var balls = {};
-		var maxSpeed = 20;
+		var user = {};
+		var myIP = 'localhost';
 
-		var socket = new WebSocket('ws://localhost:8080');
+		var socket = new WebSocket('ws://'+myIP+':8080');
 
 		socket.onmessage = function(msg){
-			console.log('got a message');
 			var parsedMsg = JSON.parse(msg.data);
-			if(parsedMsg.tag==='frame'){
-				frame(parsedMsg);
-			}
-			else if(parsedMsg.tag==='id'){
+
+			if(parsedMsg.tag==='id'){
 				var response = {
 					'tag':'id',
 					'id':'screen'
@@ -30,31 +27,132 @@
 
 				socket.send(JSON.stringify(response));
 			}
+			else if(parsedMsg.tag==='updateSpeeds'){
+				updateSpeed(parsedMsg);
+			}
+			else if(parsedMsg.tag==='birth'){
+				birth(parsedMsg);
+			}
+			else if(parsedMsg.tag==='death'){
+				killUser(parsedMsg);
+			}
 		};
 
 		//////////////////////////////////////////////////
 		//////////////////////////////////////////////////
 		//////////////////////////////////////////////////
 
-		function frame(data){
+		function killUser(msg){
+			if(user[msg.userName]){
+				delete user[msg.userName];
+			}
+		}
+
+		//////////////////////////////////////////////////
+		//////////////////////////////////////////////////
+		//////////////////////////////////////////////////
+
+		function updateSpeed(msg){
+			if(user[msg.userName]){
+				user[msg.userName].xSpeed = msg.xSpeed;
+				user[msg.userName].ySpeed = msg.ySpeed;
+			}
+			else{
+				//console.log('THAT USER DON\T EXIST: '+msg.userName);
+				// console.log(user);
+			}
+		}
+
+		//////////////////////////////////////////////////
+		//////////////////////////////////////////////////
+		//////////////////////////////////////////////////
+
+		function frame(){
+
+			updateAllUsers();
 
 			var ctx = c.getContext('2d');
-			ctx.fillStyle = '#000000';
-			ctx.fillRect(0,0,theWidth,theHeight);
+			// ctx.fillStyle = 'rgba(0,0,0,.01)';
+			// ctx.fillRect(0,0,theWidth,theHeight);
 
-			for(var i in data.myUsers){
-				ctx.fillStyle = data.myUsers[i].color;
-				var x = data.myUsers[i].x*theWidth;
-				var y = data.myUsers[i].y*theHeight;
+			for(var i in user){
+				ctx.fillStyle = user[i].color;
+				var x = user[i].x*theWidth;
+				var y = user[i].y*theHeight;
 				ctx.fillRect(x,y,30,30);
-				
 			}
-			var response = {
-				'tag':'frame'
-			};
 
-			socket.send(JSON.stringify(response));
+			requestAnimFrame(function() {
+		        frame();
+		    });
 		};
+
+		//////////////////////////////////////////////////
+		//////////////////////////////////////////////////
+		//////////////////////////////////////////////////
+
+		var xSlide = 10;
+		var ySlide = 15;
+
+		var maxSpeed = 1;
+
+		function updateAllUsers(){
+			for(var i in user){
+
+				//filtering
+				user[i].x = user[i].x + (((user[i].x + user[i].xSpeed)-user[i].x)/xSlide);
+				user[i].y = user[i].y + (((user[i].y + user[i].ySpeed)-user[i].y)/ySlide);
+
+				if(user[i].y<0) user[i].y=0;
+				else if(user[i].y>=1) user[i].y=1;
+
+				if(user[i].x>1 || user[i].x<0){
+
+					var tempX = 0;
+					if(user[i].x<0) tempX=.99;
+
+					socket.send(JSON.stringify({
+						'tag':'death',
+						'x': tempX,
+						'y': user[i].y,
+						'userName': i
+					}));
+					delete user[i];
+				}
+			}
+		}
+
+		//////////////////////////////////////////////////
+		//////////////////////////////////////////////////
+		//////////////////////////////////////////////////
+
+		function birth(data){
+			var tempUser = {
+				'xSpeed': data.xSpeed,
+				'ySpeed': data.ySpeed,
+				'x': data.x,
+				'y': data.y,
+				'color':data.color
+			}
+			if(!user[data.userName]){
+				console.log('got a birth!!!!!!!!!!!!!!!');
+				user[data.userName] = tempUser;
+			}
+			else{
+				console.log('that user already lives here, dummy');
+			}
+		}
+
+		//////////////////////////////////////////////////
+		//////////////////////////////////////////////////
+		//////////////////////////////////////////////////
+
+		window.requestAnimFrame = (function(callback) {
+		    return window.requestAnimationFrame || window.webkitRequestAnimationFrame || window.mozRequestAnimationFrame || window.oRequestAnimationFrame || window.msRequestAnimationFrame ||
+		    function(callback) {
+		      window.setTimeout(callback, 1000 / 60);
+		    };
+		})();
 
 		//////////////////////////////////////////////////
 		//////////////////////////////////////////////////
@@ -71,6 +169,18 @@
 		//////////////////////////////////////////////////
 		//////////////////////////////////////////////////
 		//////////////////////////////////////////////////
+
+		window.onload = function(){
+			var ctx = c.getContext('2d');
+			ctx.fillStyle = '#000000';
+			ctx.fillRect(0,0,theWidth,theHeight);
+			frame();
+		}
+
+		//////////////////////////////////////////////////
+		//////////////////////////////////////////////////
+		//////////////////////////////////////////////////
+
 		</script>
 	</body>
 </html>
