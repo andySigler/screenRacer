@@ -68,7 +68,6 @@ var WebSocketServer = require('ws').Server;
 var wss = new WebSocketServer({'port': 8080});
 
 wss.on('connection', function(s){
-
 	s.id = id; //give it an arbitrary id that increments
 	id++;
 
@@ -76,7 +75,6 @@ wss.on('connection', function(s){
 	s.send(JSON.stringify({'tag':'id'}));
 
 	s.on('message',function(msg){
-
 		var parsedMsg = JSON.parse(msg);
 		if(parsedMsg.tag==='id'){
 			setID(parsedMsg); //get the id (screen or user)
@@ -88,7 +86,7 @@ wss.on('connection', function(s){
 			frame(parsedMsg);
 		}
 		else if(parsedMsg.tag==='death'){
-			onDeath(parsedMsg)
+			onDeath(parsedMsg);
 		}
 	});
 
@@ -156,11 +154,9 @@ wss.on('connection', function(s){
 		}
 		else if(screens.length>0){
 			user[s.id].index=0;
-			console.log('changed this user\s screen index');
 		}
 		else{
-			console.log('shit did not work');
-			console.log(screens.length);
+			console.log('shit did not work, we only have '+screens.length+' screens');
 		}
 
 		// tell controller we're ready for more
@@ -169,18 +165,25 @@ wss.on('connection', function(s){
 
 	//if this is a new screen, loop through all users, and send birth message if needed
 	function screenBirth(){
-		for(var u in user){
-			//if any user's index is the newest screen, birth a user on that client
-			if(user[u].index<=screens.length-1){
-				//initialize a new user on the screen
-				sendBirth(u,user[u].index,0.5,0.5);
+		if(screens.length>0){
+			for(var u in user){
+				//if any user's index is the newest screen, birth a user on that client
+				if(user[u].index<=screens.length-1){
+					//initialize a new user on the screen
+					sendBirth(u,user[u].index,0.5,0.5);
+				}
+				else{
+					while(user[u].index>=screens.length){
+						user[u].index--;
+					}
+					sendBirth(u,user[u].index,0.5,0.5);
+				}
 			}
 		}
 	}
 
 	//creates a user ball on a screen
 	function sendBirth(userID,newScreenIndex,x,y){
-		console.log('birthed a new user on screen '+newScreenIndex);
 		if(screens[newScreenIndex]){
 			user[userID].index = newScreenIndex;
 			screens[newScreenIndex].send(JSON.stringify({
@@ -197,19 +200,19 @@ wss.on('connection', function(s){
 
 	//delete the user or screen when they leave
 	s.on('close',function(){
-		if(user[s.id] && screens[user[s.id].index]){
-			screens[user[s.id].index].send(JSON.stringify({
-				'tag':'death',
-				'userName':s.id
-			}));
+		if(user[s.id]){
+			for(var h=0;h<screens.length;h++){
+				screens[h].send(JSON.stringify({
+					'tag':'death',
+					'userName':s.id
+				}));
+			}
 			delete user[s.id];
-			console.log('lost a user');
 		}
 		else{
 			for(var i=0;i<screens.length;i++){
 				if(screens[i].id===s.id){
 					screens.splice(i,1);
-					console.log('lost a screen');
 					screenBirth();
 					break;
 				}

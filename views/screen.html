@@ -67,19 +67,21 @@
 		//////////////////////////////////////////////////
 		//////////////////////////////////////////////////
 
+		var squareSize = 30;
+
 		function frame(){
 
 			updateAllUsers();
 
 			var ctx = c.getContext('2d');
-			// ctx.fillStyle = 'rgba(0,0,0,.01)';
-			// ctx.fillRect(0,0,theWidth,theHeight);
+			ctx.fillStyle = 'rgba(0,0,0,.01)';
+			ctx.fillRect(0,0,theWidth,theHeight);
 
 			for(var i in user){
 				ctx.fillStyle = user[i].color;
-				var x = user[i].x*theWidth;
-				var y = user[i].y*theHeight;
-				ctx.fillRect(x,y,30,30);
+				var x = user[i].x*(theWidth-squareSize);
+				var y = user[i].y*(theHeight-squareSize);
+				ctx.fillRect(x,y,squareSize,squareSize);
 			}
 
 			requestAnimFrame(function() {
