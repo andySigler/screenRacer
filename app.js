@@ -302,6 +302,12 @@ wss.on('connection', function(s){
 				'hit':user[currentName].hit
 			}));
 		}
+		if(user[currentName]){
+			user[currentName].send(JSON.stringify({
+				'tag':'score',
+				'hit':user[currentName].hit
+			}));
+		}
 	}
 
 	function fillPass(msg){
