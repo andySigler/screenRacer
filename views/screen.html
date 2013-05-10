@@ -6,183 +6,320 @@
 	</head>
 	<body style="backgroundColor:#000000">
 		<canvas id="landscape" class="landscape"></canvas>
+		<img src="./copter.png" style="display:none" id="copter">
 		<script>
-		//////////////////////////////////////////////////
-		//////////////////////////////////////////////////
-		//////////////////////////////////////////////////
-		
-		var user = {};
-		var myIP = 'localhost';
+		if(WebSocket){
 
-		var socket = new WebSocket('ws://'+myIP+':8080');
+			//////////////////////////////////////////////////
+			//////////////////////////////////////////////////
+			//////////////////////////////////////////////////
 
-		socket.onmessage = function(msg){
-			var parsedMsg = JSON.parse(msg.data);
+			var c = document.getElementById('landscape');
 
-			if(parsedMsg.tag==='id'){
-				var response = {
-					'tag':'id',
-					'id':'screen'
-				};
+			var theWidth = window.innerWidth-7;
+			var theHeight = window.innerHeight-7;
 
-				socket.send(JSON.stringify(response));
-			}
-			else if(parsedMsg.tag==='updateSpeeds'){
-				updateSpeed(parsedMsg);
-			}
-			else if(parsedMsg.tag==='birth'){
-				birth(parsedMsg);
-			}
-			else if(parsedMsg.tag==='death'){
-				killUser(parsedMsg);
-			}
-		};
+			c.width = theWidth;
+			c.height = theHeight;
 
-		//////////////////////////////////////////////////
-		//////////////////////////////////////////////////
-		//////////////////////////////////////////////////
+			//////////////////////////////////////////////////
+			//////////////////////////////////////////////////
+			//////////////////////////////////////////////////
 
-		function killUser(msg){
-			if(user[msg.userName]){
-				delete user[msg.userName];
-			}
-		}
-
-		//////////////////////////////////////////////////
-		//////////////////////////////////////////////////
-		//////////////////////////////////////////////////
-
-		function updateSpeed(msg){
-			if(user[msg.userName]){
-				user[msg.userName].xSpeed = msg.xSpeed;
-				user[msg.userName].ySpeed = msg.ySpeed;
-			}
-			else{
-				//console.log('THAT USER DON\T EXIST: '+msg.userName);
-				// console.log(user);
-			}
-		}
-
-		//////////////////////////////////////////////////
-		//////////////////////////////////////////////////
-		//////////////////////////////////////////////////
-
-		var squareSize = 30;
-
-		function frame(){
-
-			updateAllUsers();
-
-			var ctx = c.getContext('2d');
-			ctx.fillStyle = 'rgba(0,0,0,.01)';
-			ctx.fillRect(0,0,theWidth,theHeight);
-
-			for(var i in user){
-				ctx.fillStyle = user[i].color;
-				var x = user[i].x*(theWidth-squareSize);
-				var y = user[i].y*(theHeight-squareSize);
-				ctx.fillRect(x,y,squareSize,squareSize);
+			window.onload = function(){
+				var ctx = c.getContext('2d');
+				ctx.fillStyle = '#000000';
+				ctx.fillRect(0,0,theWidth,theHeight);
+				makeObstacles(.5);
+				setInterval(function(){
+					frame();
+				},33);
 			}
 
-			requestAnimFrame(function() {
-		        frame();
-		    });
-		};
+			//////////////////////////////////////////////////
+			//////////////////////////////////////////////////
+			//////////////////////////////////////////////////
+			
+			var user = null;
+			var myIP = '128.122.98.13';
 
-		//////////////////////////////////////////////////
-		//////////////////////////////////////////////////
-		//////////////////////////////////////////////////
+			var socket = new WebSocket('ws://'+myIP+':8080');
 
-		var xSlide = 10;
-		var ySlide = 15;
+			socket.onmessage = function(msg){
+				var parsedMsg = JSON.parse(msg.data);
 
-		var maxSpeed = 1;
+				if(parsedMsg.tag==='id'){
+					var response = {
+						'tag':'id',
+						'id':'screen'
+					};
 
-		function updateAllUsers(){
-			for(var i in user){
+					socket.send(JSON.stringify(response));
+				}
+				else if(parsedMsg.tag==='updateSpeeds'){
+					updateSpeed(parsedMsg);
+				}
+				else if(parsedMsg.tag==='birth'){
+					birth(parsedMsg);
+				}
+				else if(parsedMsg.tag==='death'){
+					death();
+				}
+				else if(parsedMsg.tag==='fillPass'){
+					updateFeedback(parsedMsg);
+				}
+			};
 
-				//filtering
-				user[i].x = user[i].x + (((user[i].x + user[i].xSpeed)-user[i].x)/xSlide);
-				user[i].y = user[i].y + (((user[i].y + user[i].ySpeed)-user[i].y)/ySlide);
+			//////////////////////////////////////////////////
+			//////////////////////////////////////////////////
+			//////////////////////////////////////////////////
 
-				if(user[i].y<0) user[i].y=0;
-				else if(user[i].y>=1) user[i].y=1;
-
-				if(user[i].x>1 || user[i].x<0){
-
-					var tempX = 0;
-					if(user[i].x<0) tempX=.99;
-
-					socket.send(JSON.stringify({
-						'tag':'death',
-						'x': tempX,
-						'y': user[i].y,
-						'userName': i
-					}));
-					delete user[i];
+			function updateSpeed(msg){
+				if(user!=null){
+					user.xSpeed = msg.xSpeed;
+					user.y = msg.yPos;
+					console.log(msg.yPos);
+				}
+				else{
+					//console.log('THAT USER DON\T EXIST: '+msg.userName);
+					// console.log(user);
 				}
 			}
-		}
 
-		//////////////////////////////////////////////////
-		//////////////////////////////////////////////////
-		//////////////////////////////////////////////////
+			//////////////////////////////////////////////////
+			//////////////////////////////////////////////////
+			//////////////////////////////////////////////////
 
-		function birth(data){
-			var tempUser = {
-				'xSpeed': data.xSpeed,
-				'ySpeed': data.ySpeed,
-				'x': data.x,
-				'y': data.y,
-				'color':data.color
+			var copter=document.getElementById("copter");
+
+			var copterWidth = 100;
+			var copterHeight = 50;
+
+			var hit = false;
+
+			function frame(){
+
+				updateUser();
+
+				var ctx = c.getContext('2d');
+				if(hit){
+					ctx.fillStyle = 'rgba(255,0,0,1)';
+					hit=false;
+					ctx.fillRect(0,0,theWidth,theHeight);
+				}
+				else{
+					ctx.fillStyle = 'rgba(0,0,0,.4)';
+					ctx.fillRect(0,0,theWidth,theHeight);
+				}
+
+				if(obstacles.length===maxObstacles){
+					for(var o=0;o<maxObstacles;o++){
+
+						obstacles[o].fill*=obstacles[o].feedback;
+						obstacles[o].fill = constrain(obstacles[o].fill,0.05,1);
+
+						var tempFill = ((obstacles[o].fill*2)-1)*(Math.PI/2);
+						tempFill = (Math.sin(tempFill)+1)/2;
+
+						var tempWidth = theWidth/maxObstacles;
+
+						var x = obstacles[o].xPos;
+						var y = obstacles[o].center+(obstacleGap/2);
+						y += (theHeight-y)*(1-tempFill);
+
+						var topHeight = (obstacles[o].center-(obstacleGap/2))*tempFill;
+						var bottomHeight = theHeight-y;
+
+						if(obstacles[o].fill>.1){
+							ctx.fillStyle = obstacles[o].color;
+							ctx.fillRect(x,0,tempWidth,topHeight);
+							ctx.fillRect(x,y,tempWidth,bottomHeight);
+						}
+					}
+				}
+
+				if(user!=null){
+					ctx.fillStyle = user.color;
+					var x = user.x*theWidth;
+					var y = user.y*theHeight;
+					ctx.drawImage(copter,x-(copterWidth/2),y-(copterHeight/2),copterWidth,copterHeight);
+
+					ctx.fillStyle = '#ffffff';
+					ctx.fillText(Math.floor(y),theWidth/2,theHeight/2);
+
+					console.log(y);
+
+					if((user.y*theHeight)>obstacles[thisObstacle].center+(gapPercentage*theHeight/2)){
+						hit = true;
+					}
+					else if((user.y*theHeight)<obstacles[thisObstacle].center-(gapPercentage*theHeight/2)){
+						hit = true;
+					}
+				}
+
+				// requestAnimFrame(function(){
+			 //        frame();
+			 //    });
+			};
+
+			//////////////////////////////////////////////////
+			//////////////////////////////////////////////////
+			//////////////////////////////////////////////////
+
+			var obstacles = [];
+
+			var maxObstacles = 5;
+			var gapPercentage = .5;
+
+			var obstacleGap = theHeight*gapPercentage;
+			var drift = Math.floor(theHeight*.25);
+
+			function makeObstacles(startPercentage){
+
+				var pCenter = Math.floor(startPercentage*theHeight);
+
+				for(var o=0;o<maxObstacles;o++){
+
+					var thisCenter = pCenter+(rInt(drift)-(drift/2));
+					thisCenter = constrain(thisCenter,obstacleGap/2,theHeight-(obstacleGap/2));
+
+					obstacles[o] = {
+						'center': thisCenter,
+						'xPos': (theWidth/maxObstacles)*o,
+						'feedback':1,
+						'fill':0.01,
+						'color': 'rgb('+rInt(20,100)+','+rInt(60,200)+','+rInt(200,255)+')'
+					}
+					pCenter = thisCenter;
+				}
 			}
-			if(!user[data.userName]){
-				console.log('got a birth!!!!!!!!!!!!!!!');
-				user[data.userName] = tempUser;
+
+			//////////////////////////////////////////////////
+			//////////////////////////////////////////////////
+			//////////////////////////////////////////////////
+
+			function updateFeedback(msg){
+				if(msg.index===0){
+					makeObstacles(msg.center);
+				}
+				obstacles[msg.index].feedback = masterFeedback;
 			}
-			else{
-				console.log('that user already lives here, dummy');
+
+			//////////////////////////////////////////////////
+			//////////////////////////////////////////////////
+			//////////////////////////////////////////////////
+
+			function rInt(min,max){
+				if(arguments.length===1){
+					return Math.floor(Math.random()*min);
+				}
+				else{
+					return Math.floor((Math.random()*(max-min))+min);
+				}
 			}
+
+			function constrain(value,min,max){
+				if(value<=min){
+					return min;
+				}
+				else if(value>=max){
+					return max;
+				}
+				else{
+					return value;
+				}
+			}
+
+			//////////////////////////////////////////////////
+			//////////////////////////////////////////////////
+			//////////////////////////////////////////////////
+
+			var ySlide = 15;
+
+			var leftLimit = 0-(copterWidth/theWidth);
+			var rightLimit = 1;
+
+			var thisObstacle = 0;
+			var prevObstacle = -1;
+
+			function updateUser(){
+				if(user!=null){
+
+					//filtering
+					user.x += (user.xSpeed*.1);
+
+					if(user.y<0) user.y=0;
+					else if(user.y>=1) user.y=1;
+
+					thisObstacle = Math.floor(maxObstacles*user.x);
+					thisObstacle = constrain(thisObstacle,0,maxObstacles-1);
+
+					if(thisObstacle!=prevObstacle){
+						obstacles[thisObstacle].fill = 1;
+						if(obstacles[prevObstacle]) obstacles[prevObstacle].feedback = .9;
+						socket.send(JSON.stringify({
+							'tag': 'fillPass',
+							'index': thisObstacle,
+							'center': obstacles[maxObstacles-1].center/theHeight
+						}));
+						prevObstacle = thisObstacle;
+					}
+
+					if(user.x>rightLimit || user.x<leftLimit){
+
+						var reverseX = leftLimit+.02;
+						if(user.x<0) reverseX=rightLimit-.02;
+
+						prevObstacle=-1;
+						obstacles[maxObstacles-1].feedback = .9;
+
+						socket.send(JSON.stringify({
+							'tag':'passOn',
+							'x': reverseX,
+							'y': user.y
+						}));
+						death();
+					}
+				}
+			}
+
+			//////////////////////////////////////////////////
+			//////////////////////////////////////////////////
+			//////////////////////////////////////////////////
+
+			function death(){
+				gapPercentage = 1-((((user.xSpeed)/5)*.3)+.5);
+				obstacleGap = theHeight*gapPercentage;
+				user=null;
+				thisObstacle=0;
+			}
+
+			//////////////////////////////////////////////////
+			//////////////////////////////////////////////////
+			//////////////////////////////////////////////////
+
+			function birth(data){
+
+				var tempUser = {
+					'xSpeed': data.xSpeed,
+					'x': data.x,
+					'y': data.y,
+					'color':data.color
+				}
+				if(user===null){
+					console.log('got a birth!!!!!!!!!!!!!!!');
+					user = tempUser;
+					masterFeedback = 1+(tempUser.xSpeed*.5);
+				}
+				else{
+					console.log('that user already lives here, dummy');
+				}
+			}
+
+			//////////////////////////////////////////////////
+			//////////////////////////////////////////////////
+			//////////////////////////////////////////////////
 		}
-
-		//////////////////////////////////////////////////
-		//////////////////////////////////////////////////
-		//////////////////////////////////////////////////
-
-		window.requestAnimFrame = (function(callback) {
-		    return window.requestAnimationFrame || window.webkitRequestAnimationFrame || window.mozRequestAnimationFrame || window.oRequestAnimationFrame || window.msRequestAnimationFrame ||
-		    function(callback) {
-		      window.setTimeout(callback, 1000 / 60);
-		    };
-		})();
-
-		//////////////////////////////////////////////////
-		//////////////////////////////////////////////////
-		//////////////////////////////////////////////////
-
-		var c = document.getElementById('landscape');
-
-		var theWidth = window.innerWidth-7;
-		var theHeight = window.innerHeight-7;
-
-		c.width = theWidth;
-		c.height = theHeight;
-
-		//////////////////////////////////////////////////
-		//////////////////////////////////////////////////
-		//////////////////////////////////////////////////
-
-		window.onload = function(){
-			var ctx = c.getContext('2d');
-			ctx.fillStyle = '#000000';
-			ctx.fillRect(0,0,theWidth,theHeight);
-			frame();
-		}
-
-		//////////////////////////////////////////////////
-		//////////////////////////////////////////////////
-		//////////////////////////////////////////////////
-
 		</script>
 	</body>
 </html>

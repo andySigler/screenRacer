@@ -1,4 +1,13 @@
+/*
 
+ ####  ###### #####  #    # ######    ###### # #      ######  ####  
+#      #      #    # #    # #         #      # #      #      #      
+ ####  #####  #    # #    # #####     #####  # #      #####   ####  
+     # #      #####  #    # #         #      # #      #           # 
+#    # #      #   #   #  #  #         #      # #      #      #    # 
+ ####  ###### #    #   ##   ######    #      # ###### ######  #### 
+
+*/
 
 ///////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////
@@ -15,10 +24,9 @@ var url = require('url');
 var server = require('http').createServer(function(request,response){
 
 	var pathname = url.parse(request.url).pathname;
-	response.writeHead(200, {"Content-Type": "text/html"});
-
 	if(pathname==='/screen'){
-			fs.readFile('./views/screen.html',function(error,html){
+		response.writeHead(200, {"Content-Type": "text/html"});
+		fs.readFile('./views/screen.html',function(error,html){
 			if(error){
 				console.log('error loading screen file');
 				console.log(error);
@@ -33,7 +41,8 @@ var server = require('http').createServer(function(request,response){
 	}
 
 	else if(pathname==='/'){
-			fs.readFile('./views/controller.html',function(error,html){
+		response.writeHead(200, {"Content-Type": "text/html"});
+		fs.readFile('./views/controller.html',function(error,html){
 			if(error){
 				console.log('error loading controller file');
 				console.log(error);
@@ -42,6 +51,22 @@ var server = require('http').createServer(function(request,response){
 			}
 			else{
 				response.write(html);
+				response.end();
+			}
+		});
+	}
+
+	else if(pathname==='/copter.png'){
+		response.writeHead(200, {"Content-Type": "image/png"});
+		fs.readFile('./copter.png',function(error,img){
+			if(error){
+				console.log('error loading copter image');
+				console.log(error);
+				response.write('error loading copter image');
+				response.end();
+			}
+			else{
+				response.write(img);
 				response.end();
 			}
 		});
@@ -59,20 +84,51 @@ server.listen(port);
 ///////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////
 
+/*
+
+#    # ###### #####   ####   ####   ####  #    # ###### #####  ####  
+#    # #      #    # #      #    # #    # #   #  #        #   #      
+#    # #####  #####   ####  #    # #      ####   #####    #    ####  
+# ## # #      #    #      # #    # #      #  #   #        #        # 
+##  ## #      #    # #    # #    # #    # #   #  #        #   #    # 
+#    # ###### #####   ####   ####   ####  #    # ######   #    ####  
+
+*/
+
+///////////////////////////////////////////////////////
+///////////////////////////////////////////////////////
+///////////////////////////////////////////////////////
+
 var user = {};
 var screens = [];
-
-var id = 0;
 
 var WebSocketServer = require('ws').Server;
 var wss = new WebSocketServer({'port': 8080});
 
+var currentScreen = null;
+var currentName = null;
+
+var count = 0;
+var pScreenName = 0;
+
 wss.on('connection', function(s){
-	s.id = id; //give it an arbitrary id that increments
-	id++;
+
+	s.name=count;
+	count++;
 
 	//initialize the socket, either user or screen
 	s.send(JSON.stringify({'tag':'id'}));
+
+	/*
+
+	#####   ####  #    # ##### ###### #####  
+	#    # #    # #    #   #   #      #    # 
+	#    # #    # #    #   #   #####  #    # 
+	#####  #    # #    #   #   #      #####  
+	#   #  #    # #    #   #   #      #   #  
+	#    #  ####   ####    #   ###### #    #  
+
+	*/
 
 	s.on('message',function(msg){
 		var parsedMsg = JSON.parse(msg);
@@ -82,141 +138,236 @@ wss.on('connection', function(s){
 		else if(parsedMsg.tag==='update'){
 			updateUser(parsedMsg); //get speed from user, and pass on to current screen
 		}
-		else if(parsedMsg.tag==='frame'){
-			frame(parsedMsg);
+		else if(parsedMsg.tag==='passOn'){
+			passOn(parsedMsg);
 		}
-		else if(parsedMsg.tag==='death'){
-			onDeath(parsedMsg);
+		else if(parsedMsg.tag==='fillPass'){
+			fillPass(parsedMsg);
+		}
+		else if(parsedMsg.tag==='startGame'){
+			startGame();
+		}
+		else if(parsedMsg.tag==='gameOver'){
+			if(user[currentName]){
+				user[currentName].send(JSON.stringify({
+					'tag':'gameOver',
+					'score':user[currentName].life
+				}));
+			}
 		}
 	});
 
-	//passing on the birth message to the next screen if we've moved on
-	function onDeath(msg){
-		for(var b=0;b<screens.length;b++){
-			//find this screen's location in the array, and send to the next one (left or right)
-			if(screens[b].id===s.id){
+	/*
 
-				var tempIndex;
+	# #    # # ##### #   ##   #      # ###### ###### 
+	# ##   # #   #   #  #  #  #      #     #  #      
+	# # #  # #   #   # #    # #      #    #   #####  
+	# #  # # #   #   # ###### #      #   #    #      
+	# #   ## #   #   # #    # #      #  #     #      
+	# #    # #   #   # #    # ###### # ###### ###### 
 
-				//the next index depends on which direction we're moving
-				if(msg.x<.5){
-					tempIndex = b+1;
-					if(tempIndex===screens.length){
-						tempIndex=0;
-					}
-				}
-				else if(msg.x>.5){
-					tempIndex = b-1;
-					if(tempIndex<0) {
-						tempIndex=screens.length-1;
-					}
-				}
+	*/
 
-				sendBirth(msg.userName,tempIndex,msg.x,msg.y);
-				break;
-			}
+	function startGame(){
+		if(currentName!=null && currentScreen!=null){
+			sendBirth(.03,.5,0);
+			//start the handshake method
+			if(user[currentName]) user[currentName].send(JSON.stringify({'tag':'update'}));
 		}
 	}
 
 	function setID(data){
 		if(data.id==='user'){
-			s.index = 0; //what screen are we on?
-			s.xSpeed = 0;
-			s.ySpeed = 0;
-			s.color = data.color;
-			user[s.id] = s;
-			s.send(JSON.stringify({'tag':'update'})); //start the handshake method
-			if(screens.length>0){
-				sendBirth(s.id,s.index,.5,.5);
+			s.id='user';
+			user[s.name] = s;
+			user[s.name].index = 0; //what screen are we on?
+			user[s.name].xSpeed = 0;
+			user[s.name].yPos = 0;
+			user[s.name].color = data.color;
+			user[s.name].life = 0;
+			user[s.name].hit = 0;
+			if(currentName===null) {
+				prepareNewUser(s.name);
 			}
 		}
 		else if(data.id==='screen'){
+			s.id='screen';
 			screens.push(s);
-			screenBirth();
+			if(currentScreen===null){
+				currentScreen=0;
+			}
+			screenOrder();
 		}
 	};
+
+	function prepareNewUser(tempName){
+		currentName = tempName;
+		if(user[currentName]){
+			user[currentName].send(JSON.stringify({'tag':'firstInLine'}));
+			for(var i=0;i<screens.length;i++){
+				screens[i].send(JSON.stringify({'tag':'restart'}));
+			}
+		}
+	}
+
+	function screenOrder(){
+		for(var i=0;i<screens.length;i++){
+			if(screens[i]){
+				screens[i].send(JSON.stringify({
+					'tag':'order',
+					'value':i+1
+				}));
+			}
+		}
+	}
+
+	/*
+
+	 ####   ####  #    # ##### #####   ####  #         # #    # 
+	#    # #    # ##   #   #   #    # #    # #         # ##   # 
+	#      #    # # #  #   #   #    # #    # #         # # #  # 
+	#      #    # #  # #   #   #####  #    # #         # #  # # 
+	#    # #    # #   ##   #   #   #  #    # #         # #   ## 
+	 ####   ####  #    #   #   #    #  ####  ######    # #    # 
+
+	*/
 
 	//handshake method for the controlling broswers
 	function updateUser(data){
 
-		user[s.id].xSpeed = data.xSpeed;
-		user[s.id].ySpeed = data.ySpeed;
+		user[currentName].xSpeed = data.xSpeed;
+		user[currentName].yPos = data.yPos;
 
-		if(screens[user[s.id].index]){
+		if(screens[currentScreen]){
 
 			//send the new speed to the specified screen
-			screens[user[s.id].index].send(JSON.stringify({
+			screens[currentScreen].send(JSON.stringify({
 				'tag':'updateSpeeds',
-				'xSpeed': user[s.id].xSpeed,
-				'ySpeed': user[s.id].ySpeed,
-				'userName': s.id
+				'xSpeed': user[currentName].xSpeed,
+				'yPos': user[currentName].yPos
 			}));
+			s.send(JSON.stringify({'tag':'update'}));
 		}
 		else if(screens.length>0){
-			user[s.id].index=0;
+			currentScreen++;
+			if(currentScreen>=screens.length){
+				currentScreen=0;
+			}
+			sendBirth(user[currentName].x,user[currentName].y,user[currentName].life);
 		}
 		else{
-			console.log('shit did not work, we only have '+screens.length+' screens');
+			currentScreen=null;
 		}
-
-		// tell controller we're ready for more
-		s.send(JSON.stringify({'tag':'update'}));
 	};
 
-	//if this is a new screen, loop through all users, and send birth message if needed
-	function screenBirth(){
-		if(screens.length>0){
-			for(var u in user){
-				//if any user's index is the newest screen, birth a user on that client
-				if(user[u].index<=screens.length-1){
-					//initialize a new user on the screen
-					sendBirth(u,user[u].index,0.5,0.5);
-				}
-				else{
-					while(user[u].index>=screens.length){
-						user[u].index--;
-					}
-					sendBirth(u,user[u].index,0.5,0.5);
-				}
+	/*
+
+	#####    ##    ####   ####      ####  #    # 
+	#    #  #  #  #      #         #    # ##   # 
+	#    # #    #  ####   ####     #    # # #  # 
+	#####  ######      #      #    #    # #  # # 
+	#      #    # #    # #    #    #    # #   ## 
+	#      #    #  ####   ####      ####  #    # 
+
+	*/
+
+	function passOn(msg){
+		user[currentName].life++;
+		user[currentName].hit = msg.hit;
+		if(msg.x<.5){
+			currentScreen++;
+			if(currentScreen===screens.length){
+				currentScreen=0;
 			}
 		}
+		else if(msg.x>.5){
+			currentScreen--;
+			if(currentScreen<0) {
+				currentScreen=screens.length-1;
+			}
+		}
+		sendBirth(msg.x,msg.y,user[currentName].life);
 	}
 
 	//creates a user ball on a screen
-	function sendBirth(userID,newScreenIndex,x,y){
-		if(screens[newScreenIndex]){
-			user[userID].index = newScreenIndex;
-			screens[newScreenIndex].send(JSON.stringify({
+	function sendBirth(x,y,life){
+		if(screens[currentScreen]){
+			screens[currentScreen].send(JSON.stringify({
 				'tag':'birth',
-				'userName': userID,
-				'xSpeed': user[userID].xSpeed,
-				'ySpeed': user[userID].ySpeed,
-				'color': user[userID].color,
+				'xSpeed': user[currentName].xSpeed,
+				'color': user[currentName].color,
 				'x': x,
-				'y': y
+				'y': y,
+				'life':life,
+				'hit':user[currentName].hit
 			}));
 		}
 	}
 
-	//delete the user or screen when they leave
-	s.on('close',function(){
-		if(user[s.id]){
-			for(var h=0;h<screens.length;h++){
-				screens[h].send(JSON.stringify({
-					'tag':'death',
-					'userName':s.id
+	function fillPass(msg){
+		for(var i=0;i<screens.length;i++){
+			if(screens[i].name===s.name){
+				var tempIndex = i+1;
+				if(tempIndex===screens.length) tempIndex=0;
+				screens[tempIndex].send(JSON.stringify({
+					'tag': 'fillPass',
+					'index':msg.index,
+					'center':msg.center,
+					'life': msg.life
 				}));
 			}
-			delete user[s.id];
+		}
+	}
+
+	/*
+
+	 ####   ####   ####  #    # ###### #####     ####  #       ####   ####  ###### #####  
+	#      #    # #    # #   #  #        #      #    # #      #    # #      #      #    # 
+	 ####  #    # #      ####   #####    #      #      #      #    #  ####  #####  #    # 
+	     # #    # #      #  #   #        #      #      #      #    #      # #      #    # 
+	#    # #    # #    # #   #  #        #      #    # #      #    # #    # #      #    # 
+	 ####   ####   ####  #    # ######   #       ####  ######  ####   ####  ###### #####  
+
+	*/
+
+	//delete the user or screen when they leave
+	s.on('close',function(){
+		if(s.id==='user'){
+			delete user[currentName];
+			currentName = null;
+			for(var u in user){
+				try{
+					prepareNewUser(user[u].name);
+					break;
+				}
+				catch(err){}
+			}
+			if(screens[currentScreen]){
+				screens[currentScreen].send(JSON.stringify({
+					'tag':'death'
+				}));
+				if(screens[currentScreen+1]){
+					screens[currentScreen+1].send(JSON.stringify({
+						'tag':'death'
+					}));
+					currentScreen=0;
+				}
+				else if(screens[0]){
+					screens[0].send(JSON.stringify({
+						'tag':'death'
+					}));
+					currentScreen=0;
+				}
+			}
 		}
 		else{
 			for(var i=0;i<screens.length;i++){
-				if(screens[i].id===s.id){
+				if(screens[i].name===s.name){
 					screens.splice(i,1);
-					screenBirth();
 					break;
 				}
 			}
+			screenOrder();
 		}
 	});
 });

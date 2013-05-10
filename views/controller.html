@@ -3,80 +3,141 @@
 	<head>
 		<meta charset="utf-8">
         <title>Controller</title>
+        <style>
+        	#container{
+        		text-align: center;
+        		font-family: sans-serif;
+        		color:#ffffff;
+        	}
+        	h1{
+        		font-size: 100px;
+        	}
+        	body{
+				margin:0;
+				padding:0
+			}
+			#body{
+				width:800px;
+				margin:auto;
+				margin-top:200px;
+				text-align: center;
+			}
+			#message{
+				margin-bottom:20px;
+				padding:20px;
+				font-size: 60px;
+				font-family: sans-serif;
+			}
+        </style>
 	</head>
 	<body>
-		<!-- <script src="/socket.io/socket.io.js"></script> -->
+		<div id="container">
+			<h1 id="message"></h1>
+		</div>
 		<script>
-		////////////////////////////////////////////////
-		////////////////////////////////////////////////
-		////////////////////////////////////////////////
 
-		var xSpeed = 0;
-		var ySpeed = 0;
+		document.body.style.background = '#000000';
+		document.getElementById('message').innerHTML = 'Please update your browser :(';
 
-		var ready = false;
+		if(WebSocket){
 
-		var socket = new WebSocket('ws://localhost:8080');
+			document.getElementById('message').innerHTML = 'Please use an iPhone :(';
 
-		var r = rand(255);
-		var g = rand(255);
-		var b = rand(255);
+			if (navigator.userAgent.toLowerCase().indexOf("iphone") ==-1){
 
-		var color = '#'+RGB2HTML(r,g,b);
-		var textColor = '#'+RGB2HTML(255-r,255-g,255-b);
-		document.body.style.background = color;
+				document.getElementById('message').innerHTML = 'iPhone Connected, please wait...';
 
-		socket.onmessage = function(msg){
-			console.log('got a message');
-			var parsedMsg = JSON.parse(msg.data);
-			if(parsedMsg.tag==='id'){
-				var response = {
-					'tag':'id',
-					'id':'user',
-					'color':color
+				////////////////////////////////////////////////
+				////////////////////////////////////////////////
+				////////////////////////////////////////////////
+
+				var xSpeed = 0;
+				var ySpeed = 0;
+
+				var ready = false;
+
+				var myIP = '128.122.98.13';
+
+				var socket = new WebSocket('ws://'+myIP+':8080');
+
+				var r = rand(255);
+				var g = rand(255);
+				var b = rand(255);
+
+				var color = '#'+RGB2HTML(r,g,b);
+				var textColor = '#'+RGB2HTML(255-r,255-g,255-b);
+				document.body.style.background = color;
+
+				socket.onmessage = function(msg){
+					console.log('got a message');
+					var parsedMsg = JSON.parse(msg.data);
+					if(parsedMsg.tag==='id'){
+						var response = {
+							'tag':'id',
+							'id':'user',
+							'color':color
+						};
+
+						socket.send(JSON.stringify(response));
+					}
+
+					else if(parsedMsg.tag==='update'){
+						//document.getElementById('message').innerHTML = 'Start Playing!';
+						ready = true;
+					}
 				};
 
-				socket.send(JSON.stringify(response));
+				////////////////////////////////////////////////
+				////////////////////////////////////////////////
+				////////////////////////////////////////////////
+
+				window.ondeviceorientation = function(event) {
+					console.log(event);
+					ySpeed = event.beta/90;
+					document.getElementById('message').innerHTML = ySpeed;
+					xSpeed = 1;
+					if(ready){
+						socket.send(JSON.stringify({
+							'tag':'update',
+							'xSpeed':xSpeed,
+							'ySpeed':ySpeed
+						}));
+					}
+				};
+
+				// window.ondevicemotion = function(event) {
+				// 	ySpeed = event.accelerationIncludingGravity.y/10;
+				// 	document.getElementById('message').innerHTML = ySpeed;
+				// 	xSpeed = 1;
+				// 	if(ready){
+				// 		socket.send(JSON.stringify({
+				// 			'tag':'update',
+				// 			'xSpeed':xSpeed,
+				// 			'ySpeed':ySpeed
+				// 		}));
+				// 		//ready = false;
+				// 	}
+				// };
+
+				////////////////////////////////////////////////
+				////////////////////////////////////////////////
+				////////////////////////////////////////////////
+
+				function RGB2HTML(red, green, blue){
+				    var decColor = red + 256 * green + 65536 * blue;
+				    return decColor.toString(16);
+				}
+
+				function rand(max){
+					return Math.floor(Math.random()*max);
+				}
+
+				//////////////////////////////////////////////////
+				//////////////////////////////////////////////////
+				//////////////////////////////////////////////////
 			}
 
-			else if(parsedMsg.tag==='update'){
-				ready = true;
-			}
-		};
-
-		////////////////////////////////////////////////
-		////////////////////////////////////////////////
-		////////////////////////////////////////////////
-
-		window.ondeviceorientation = function(event) {
-			ySpeed = event.beta/90
-			xSpeed = event.gamma/90;
-			if(ready){
-				socket.send(JSON.stringify({
-					'tag':'update',
-					'xSpeed':xSpeed,
-					'ySpeed':ySpeed
-				}));
-				ready = false;
-			}
-		};
-
-		////////////////////////////////////////////////
-		////////////////////////////////////////////////
-		////////////////////////////////////////////////
-
-		function RGB2HTML(red, green, blue){
-		    var decColor = red + 256 * green + 65536 * blue;
-		    return decColor.toString(16);
 		}
-
-		function rand(max){
-			return Math.floor(Math.random()*max);
-		}
-
-		//////////////////////////////////////////////////
-		//////////////////////////////////////////////////
-		//////////////////////////////////////////////////
 		</script>
 	</body>
 </html>
