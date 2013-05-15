@@ -148,11 +148,26 @@ wss.on('connection', function(s){
 			startGame();
 		}
 		else if(parsedMsg.tag==='gameOver'){
-			if(user[currentName]){
+			try{
 				user[currentName].send(JSON.stringify({
 					'tag':'gameOver',
 					'score':user[currentName].life
 				}));
+			}
+			catch(err){
+				console.log('the loser is already disconnected');
+				console.log('threw error: '+err);
+			}
+		}
+		else if(parsedMsg.tag==='score'){
+			if(user[currentName]){
+				try{
+					user[currentName].send(JSON.stringify({
+						'tag':'score',
+						'hit':parsedMsg.hit
+					}));
+				}
+				catch(err){}
 			}
 		}
 	});
@@ -299,12 +314,6 @@ wss.on('connection', function(s){
 				'x': x,
 				'y': y,
 				'life':life,
-				'hit':user[currentName].hit
-			}));
-		}
-		if(user[currentName]){
-			user[currentName].send(JSON.stringify({
-				'tag':'score',
 				'hit':user[currentName].hit
 			}));
 		}
