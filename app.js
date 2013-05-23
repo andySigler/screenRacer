@@ -111,6 +111,8 @@ var currentName = null;
 var count = 0;
 var pScreenName = 0;
 
+var highScore = [];
+
 wss.on('connection', function(s){
 
 	s.name=count;
@@ -149,9 +151,21 @@ wss.on('connection', function(s){
 		}
 		else if(parsedMsg.tag==='gameOver'){
 			try{
+				highScore.push(user[currentName].life);
+				for(var h=1;h<highScore.length;h++){
+					if(highScore[h]===highScore[h-1]){
+						highScore.splice(h,1);
+						h--;
+					}
+				}
+				highScore.sort(function(a,b){
+					return b-a;
+				});
+				highScore = highScore.splice(0,7);
 				user[currentName].send(JSON.stringify({
 					'tag':'gameOver',
-					'score':user[currentName].life
+					'score':user[currentName].life,
+					'highScore': highScore
 				}));
 			}
 			catch(err){
@@ -218,7 +232,10 @@ wss.on('connection', function(s){
 	function prepareNewUser(tempName){
 		currentName = tempName;
 		if(user[currentName]){
-			user[currentName].send(JSON.stringify({'tag':'firstInLine'}));
+			user[currentName].send(JSON.stringify({
+				'tag':'firstInLine',
+				'highScore': highScore
+		}));
 			for(var i=0;i<screens.length;i++){
 				screens[i].send(JSON.stringify({'tag':'restart'}));
 			}
@@ -287,21 +304,26 @@ wss.on('connection', function(s){
 	*/
 
 	function passOn(msg){
-		user[currentName].life++;
-		user[currentName].hit = msg.hit;
-		if(msg.x<.5){
-			currentScreen++;
-			if(currentScreen===screens.length){
-				currentScreen=0;
+		try{
+			user[currentName].life++;
+			user[currentName].hit = msg.hit;
+			if(msg.x<.5){
+				currentScreen++;
+				if(currentScreen===screens.length){
+					currentScreen=0;
+				}
 			}
-		}
-		else if(msg.x>.5){
-			currentScreen--;
-			if(currentScreen<0) {
-				currentScreen=screens.length-1;
+			else if(msg.x>.5){
+				currentScreen--;
+				if(currentScreen<0) {
+					currentScreen=screens.length-1;
+				}
 			}
+			sendBirth(msg.x,msg.y,user[currentName].life);
 		}
-		sendBirth(msg.x,msg.y,user[currentName].life);
+		catch(err){
+			console.log('could not send birth, it is gone!')
+		}
 	}
 
 	//creates a user ball on a screen
